@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Outland — Structure</title>
+  <style>
+    html, body { height: 100%; margin: 0; background:#ffffff; }
+    #chart { width: 100vw; height: 100vh; }
+    * { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  </style>
+  <script src="./echarts.min.js"></script>
+</head>
+<body>
+  <div id="chart"></div>
+  <script>
+    // Compact hierarchical dataset (flattened roles for simplicity)
+    const projects = [
+      { name:"Conway Main House, Gatehouse", people:["Webster H","Gina Johnston","Carl Bignell"] },
+      { name:"EMB & Ampitheatre", people:["Webster H","Gina Johnston","Carl Bignell"] },
+      { name:"Guest Village", people:["Webster H","Gina Johnston","Carl Bignell"] },
+      { name:"Pavilion and Tunnel", people:["Webster H","Gina Johnston","Carl Bignell"] },
+      { name:"Conway Landscape", people:["Webster H","Gina Johnston","Carl Bignell"] },
+      { name:"Coast", people:["John Martin","Chris Houck","Carl Bignell"] },
+      { name:"Arc", people:["Jack Cowdrey","David Luxon","Carl Bignell"] },
+      { name:"130 Whitehall Court", people:["Jack Cowdrey","David Luxon","Carl Bignell"] },
+      { name:"80–81 Whitehall Court", people:["Jack Cowdrey","Carl Bignell"] },
+      { name:"Hollycombe House", people:["Colliers","David Luxon","Carl Bignell"] },
+      { name:"Hatch / Mill Farm", people:["Cove","David Luxon","Carl Bignell"] },
+      { name:"The Old Stables", people:["Colliers","David Luxon","Carl Bignell"] },
+      { name:"One Hyde Park", people:["Colliers","Chris Houck","Ben Robinson","Carl Bignell"] },
+      { name:"Wapping", people:["Jack Cowdrey","David Luxon","Carl Bignell"] },
+      { name:"Marylebone", people:["Jack Cowdrey","Gina Johnston","Carl Bignell"] },
+    ];
+
+    const root = {
+      name: "Outland.",
+      children: projects.map(p => ({
+        name: p.name,
+        children: p.people.map(person => ({ name: person, value: 1 }))
+      }))
+    };
+
+    const chart = echarts.init(document.getElementById("chart"), null, { renderer: "canvas" });
+
+    chart.setOption({
+      backgroundColor: "#ffffff",
+      series: [{
+        type: "sunburst",
+        data: [root],
+        radius: [0, "95%"],
+        sort: null,
+        nodeClick: false,
+        emphasis: { focus: "none" },
+        itemStyle: { borderColor: "#ffffff", borderWidth: 1 },
+        label: { rotate: "radial", color: "#111" },
+        levels: [
+          {},
+          {
+            r0: "0%", r: "12%",
+            itemStyle: { color: "#000000", borderColor: "#000000" },
+            label: { color: "#ffffff", fontSize: 14, fontWeight: 600, rotate: 0 }
+          },
+          {
+            r0: "12%", r: "60%",
+            itemStyle: { color: "#D3D3D3", borderColor: "#ffffff" },
+            label: { rotate: "radial", fontSize: 12, color: "#111111" }
+          },
+          {
+            r0: "60%", r: "95%",
+            itemStyle: { color: "#FFA077", borderColor: "#ffffff" },
+            label: { rotate: "radial", fontSize: 11, color: "#111111" }
+          }
+        ]
+      }],
+      tooltip: {
+        trigger: "item",
+        formatter: (p) => p.treePathInfo.map(n => n.name).filter(Boolean).join(" / "),
+        backgroundColor: "#fff",
+        borderColor: "#ddd",
+        borderWidth: 1,
+        textStyle: { color: "#111", fontSize: 12 }
+      }
+    });
+
+    window.addEventListener("resize", () => chart.resize());
+  </script>
+</body>
+</html>
