@@ -9,40 +9,45 @@
     #chart { width: 100vw; height: 100vh; touch-action: none; }
     * { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
 
-    /* --- Minimal unified UI (text-only control) --- */
+    /* --- Minimal UI --- */
     .ui {
-      position: fixed;
-      right: 20px;
-      top: 20px;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      user-select: none;
-      color: #000;
-      cursor: pointer;
+      position: fixed; right: 14px; top: 14px; z-index: 20;
+      display: flex; gap: .5rem; align-items: center;
     }
-    .ui span { display: inline-block; }
-    .ui .home { font-size: 16px; font-weight: 500; }
-    .ui .plus {
-      font-size: 22px; font-weight: 500;
-      transform-origin: center;
-      transition: transform 0.4s ease;
+    .home-btn {
+      padding: .45rem .75rem;
+      border: 1px solid #d0d0d0; border-radius: 10px; background:#fff;
+      font-size: 14px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.05);
     }
-    /* Rotate + to × when open */
-    .ui.open .plus { transform: rotate(45deg); }
-    /* Subtle roll on hover */
-    .ui:hover .plus { transform: rotate(90deg); }
 
-    /* Dropdown (square corners, minimalist) */
-    .picker-panel {
-      position: absolute; right: 0; top: 36px;
-      background:#fff; border:1px solid #d0d0d0; border-radius:0;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-      width: 260px; max-height: 60vh; overflow:auto;
-      display: none;
+    /* Floating project picker */
+    .picker-wrap { position: relative; }
+    .picker-toggle {
+      width: 38px; height: 38px; border-radius: 50%;
+      border: 1px solid #d0d0d0; background: #fff; cursor: pointer;
+      display: grid; place-items: center; box-shadow: 0 2px 10px rgba(0,0,0,.06);
+      transition: transform .28s ease;
     }
-    .ui.open .picker-panel { display:block; }
+    .picker-toggle .plus {
+      width: 18px; height: 18px; position: relative;
+    }
+    .picker-toggle .plus::before,
+    .picker-toggle .plus::after {
+      content: ""; position: absolute; left: 50%; top: 50%;
+      width: 2px; height: 18px; background: #333; transform: translate(-50%, -50%) rotate(0deg);
+      transition: transform .28s ease;
+    }
+    .picker-toggle .plus::after { transform: translate(-50%, -50%) rotate(90deg); }
+    .picker-wrap.open .picker-toggle .plus::before { transform: translate(-50%, -50%) rotate(45deg); }
+    .picker-wrap.open .picker-toggle .plus::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
+    .picker-panel {
+      position: absolute; right: 0; top: 46px;
+      background:#fff; border:1px solid #d0d0d0; border-radius:0;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+      width: 260px; max-height: 60vh; overflow:auto; display:none;
+    }
+    .picker-wrap.open .picker-panel { display:block; }
     .picker-item {
       padding: .6rem .8rem; cursor:pointer; font-size: 14px; color:#222;
       border-bottom: 1px solid #f2f2f2;
@@ -51,51 +56,48 @@
 
     @media (max-width:640px){
       .picker-panel { width: 85vw; }
-      .ui .home { font-size: 15px; }
-      .ui .plus { font-size: 20px; }
+      .home-btn { padding:.4rem .6rem; font-size:13px; }
     }
   </style>
-  <!-- Local ECharts (place echarts.min.js next to this file) -->
   <script src="./echarts.min.js"></script>
 </head>
 <body>
-  <!-- Unified UI control -->
-  <div class="ui" id="uiControl" title="Home • Project list">
-    <span class="home">Home</span>
-    <span class="plus">+</span>
-    <div class="picker-panel" id="pickerPanel"></div>
+  <div class="ui">
+    <div class="picker-wrap" id="pickerWrap">
+      <button class="picker-toggle" id="pickerToggle" aria-label="Jump to project">
+        <span class="plus"></span>
+      </button>
+      <div class="picker-panel" id="pickerPanel">
+        <div id="pickerItems"></div>
+      </div>
+    </div>
+    <button class="home-btn" id="homeBtn" style="display:none">Home</button>
   </div>
 
   <div id="chart"></div>
 
   <script>
-    // ----------------- Data -----------------
     const rows = [
-      { project:"Conway Main House, Gatehouse", abbr:"Conway",     pp:"Gina Johnston", pm:"Webster H",    consultant:["Webster H"] },
-      { project:"EMB & Ampitheatre",           abbr:"EMB",        pp:"Gina Johnston", pm:"Webster H",    consultant:["Webster H"] },
-      { project:"Guest Village",               abbr:"Guest",      pp:"Gina Johnston", pm:"Webster H",    consultant:["Webster H"] },
-      { project:"Pavilion and Tunnel",         abbr:"Pavilion",   pp:"Gina Johnston", pm:"Webster H",    consultant:["Webster H"] },
-      { project:"Conway Landscape",            abbr:"Landscape",  pp:"Gina Johnston", pm:"Webster H",    consultant:["Webster H"] },
-      { project:"Coast",                       abbr:"Coast",      pp:"Chris Houck",   pm:"John Martin",  consultant:[] },
-      { project:"Arc",                         abbr:"Arc",        pp:"David Luxon",   pm:"Jack Cowdrey", consultant:[] },
-      { project:"130 Whitehall Court",         abbr:"130 WHC",    pp:"David Luxon",   pm:"Jack Cowdrey", consultant:[] },
-      { project:"80–81 Whitehall Court",       abbr:"80–81 WHC",  pp:"Carl Bignell",  pm:"Jack Cowdrey", consultant:[] },
-      { project:"Hollycombe House",            abbr:"Hollycombe", pp:"David Luxon",   pm:"Colliers",     consultant:["Colliers"] },
-      { project:"Hatch / Mill Farm",           abbr:"Hatch",      pp:"David Luxon",   pm:"Cove",         consultant:["Cove"] },
-      { project:"The Old Stables",             abbr:"Stables",    pp:"David Luxon",   pm:"Colliers",     consultant:["Colliers"] },
-      { project:"One Hyde Park",               abbr:"OHP",        pp:"Chris Houck",   pm:"Colliers",     consultant:["Colliers","Ben Robinson","Carl Bignell"] },
-      { project:"Wapping",                     abbr:"Wapping",    pp:"David Luxon",   pm:"Jack Cowdrey", consultant:[] },
-      { project:"Marylebone",                  abbr:"Marylebone", pp:"Gina Johnston", pm:"Jack Cowdrey", consultant:[] },
+      { project:"Conway Main House, Gatehouse", abbr:"Conway", pp:"Gina Johnston", pm:"Webster H", consultant:["Webster H"] },
+      { project:"EMB & Ampitheatre", abbr:"EMB", pp:"Gina Johnston", pm:"Webster H", consultant:["Webster H"] },
+      { project:"Guest Village", abbr:"Guest", pp:"Gina Johnston", pm:"Webster H", consultant:["Webster H"] },
+      { project:"Pavilion and Tunnel", abbr:"Pavilion", pp:"Gina Johnston", pm:"Webster H", consultant:["Webster H"] },
+      { project:"Conway Landscape", abbr:"Landscape", pp:"Gina Johnston", pm:"Webster H", consultant:["Webster H"] },
+      { project:"Coast", abbr:"Coast", pp:"Chris Houck", pm:"John Martin", consultant:[] },
+      { project:"Arc", abbr:"Arc", pp:"David Luxon", pm:"Jack Cowdrey", consultant:[] },
+      { project:"130 Whitehall Court", abbr:"130 WHC", pp:"David Luxon", pm:"Jack Cowdrey", consultant:[] },
+      { project:"80–81 Whitehall Court", abbr:"80–81 WHC", pp:"Carl Bignell", pm:"Jack Cowdrey", consultant:[] },
+      { project:"Hollycombe House", abbr:"Hollycombe", pp:"David Luxon", pm:"Colliers", consultant:["Colliers"] },
+      { project:"Hatch / Mill Farm", abbr:"Hatch", pp:"David Luxon", pm:"Cove", consultant:["Cove"] },
+      { project:"The Old Stables", abbr:"Stables", pp:"David Luxon", pm:"Colliers", consultant:["Colliers"] },
+      { project:"One Hyde Park", abbr:"OHP", pp:"Chris Houck", pm:"Colliers", consultant:["Colliers","Ben Robinson","Carl Bignell"] },
+      { project:"Wapping", abbr:"Wapping", pp:"David Luxon", pm:"Jack Cowdrey", consultant:[] },
+      { project:"Marylebone", abbr:"Marylebone", pp:"Gina Johnston", pm:"Jack Cowdrey", consultant:[] },
     ];
 
-    // Classification
-    const NEW_HIRES   = new Set(["Jack Cowdrey","John Martin"]);
+    const NEW_HIRES = new Set(["Jack Cowdrey","John Martin"]);
     const CONSULTANTS = new Set(["Webster H","Colliers","Cove"]);
-    const COLORS = {
-      bg:"#f5f5f5", hub:"#000", project:"#D3D3D3",
-      emp:"#ffa077", new:"#fff", con:"#D3D3D3",
-      border:"#333", link:"#c8c8c8"
-    };
+    const COLORS = { bg:"#f5f5f5", hub:"#000", project:"#D3D3D3", emp:"#ffa077", new:"#fff", con:"#D3D3D3", border:"#333", link:"#c8c8c8" };
 
     function personType(name){
       if (NEW_HIRES.has(name)) return "new";
@@ -104,159 +106,91 @@
     }
     function styleForPerson(name){
       const t = personType(name);
-      if (t === "new") return { color: COLORS.new, borderColor: COLORS.border, borderWidth: 2 };
-      if (t === "con") return { color: COLORS.con, borderColor: COLORS.con, borderWidth: 2 };
-      return { color: COLORS.emp, borderColor: COLORS.emp, borderWidth: 2 };
+      if (t==="new") return {color:COLORS.new, borderColor:COLORS.border, borderWidth:2};
+      if (t==="con") return {color:COLORS.con, borderColor:COLORS.con, borderWidth:2};
+      return {color:COLORS.emp, borderColor:COLORS.emp, borderWidth:2};
     }
 
-    // Chart
-    const chart = echarts.init(document.getElementById("chart"), null, { renderer: "canvas" });
+    const chart = echarts.init(document.getElementById("chart"), null, { renderer:"canvas" });
 
-    // ----------------- Home (radial pie of projects) -----------------
     function setHome(){
-      const pieData = rows.map(r=>({
-        name: r.abbr, value: 1,
-        itemStyle: { color: COLORS.project, borderColor: "#fff", borderWidth: 2 },
-        tooltip: { value: r.project }
-      }));
-
+      const pieData = rows.map(r=>({name:r.abbr, value:1, itemStyle:{color:COLORS.project, borderColor:"#fff", borderWidth:2}, tooltip:{value:r.project}}));
       chart.clear();
       chart.setOption({
-        backgroundColor: COLORS.bg,
-        series: [{
-          type: "pie",
-          radius: ["42%","82%"],
-          center: ["50%","50%"],
-          label: { position: "inside", color: "#111", fontSize: 13, formatter: "{b}" },
-          labelLine: { length: 10, length2: 6 },
-          data: pieData,
-          animationDuration: 250
+        backgroundColor:COLORS.bg,
+        series:[{
+          type:"pie", radius:["42%","82%"], center:["50%","50%"],
+          label:{position:"inside", color:"#111", fontSize:13, formatter:"{b}"},
+          data:pieData
         }],
-        graphic: [
-          { type: "circle", left: "center", top: "middle", shape: { r: 100 }, style: { fill: COLORS.hub } },
-          { type: "text", left: "center", top: "middle",
-            style: { text: "Outland.", fill: "#fff", fontSize: 24, fontWeight: 700, textAlign: "center" } }
+        graphic:[
+          {type:"circle", left:"center", top:"middle", shape:{r:90}, style:{fill:COLORS.hub}},
+          {type:"text", left:"center", top:"middle", style:{text:"Outland.", fill:"#fff", fontSize:22, fontWeight:700, textAlign:"center"}}
         ],
-        tooltip: { trigger: "item", formatter: p => p.data?.tooltip?.value || p.name }
+        tooltip:{trigger:"item", formatter:p=>p.data?.tooltip?.value || p.name}
       });
-
       chart.off("click");
-      chart.on("click", p => { if (p.seriesType === "pie") openProject(p.data.tooltip.value); });
-
-      // UI state
-      uiControl.classList.remove("open");
+      chart.on("click",p=>{ if(p.seriesType==="pie") openProject(p.data.tooltip.value); });
+      document.getElementById("homeBtn").style.display="none";
     }
 
-    // ----------------- Project detail (bubbles radiating from project) -----------------
     function openProject(projectName){
       const row = rows.find(r=>r.project===projectName);
-      if (!row) return;
-
-      const W = chart.getWidth(), H = chart.getHeight();
-      const cx = W/2, cy = H/2;
-
-      const nodes = [], links = [];
-
-      // Project hub (center)
+      if(!row) return;
+      const cx = chart.getWidth()/2, cy = chart.getHeight()/2;
+      const nodes=[], links=[];
       nodes.push({
-        id: "project", name: projectName, x: cx, y: cy,
-        symbol: "circle", symbolSize: 170,
-        itemStyle: { color: COLORS.project, borderColor: COLORS.project, borderWidth: 2 },
-        label: { show:true, position: "inside", color: "#111", fontSize: 18, fontWeight: 700 }
+        id:"project", name:row.project, x:cx, y:cy,
+        symbol:"circle", symbolSize:160,
+        itemStyle:{color:COLORS.project, borderColor:COLORS.project},
+        label:{show:true, position:"inside", color:"#111", fontSize:16, fontWeight:700}
       });
 
-      // Role nodes
-      const parts = [
-        { label: `Project Principal — ${row.pp}`, style: styleForPerson(row.pp) },
-        { label: `Project Manager — ${row.pm}`, style: styleForPerson(row.pm) },
-        ...(row.consultant||[]).map(n => ({ label: `Consultant — ${n}`, style: styleForPerson(n) }))
+      const items=[
+        {label:`Project Principal — ${row.pp}`, style:styleForPerson(row.pp)},
+        {label:`Project Manager — ${row.pm}`, style:styleForPerson(row.pm)},
+        ...(row.consultant||[]).map(n=>({label:`Consultant — ${n}`, style:styleForPerson(n)}))
       ];
-
-      const radius = Math.min(W, H) * 0.33;
-      const nodeSize = 140;
-      const step = 360 / parts.length;
-      for (let i=0;i<parts.length;i++){
-        const ang = (i * step - 90) * Math.PI/180;
-        const x = cx + Math.cos(ang) * radius;
-        const y = cy + Math.sin(ang) * radius;
-        const id = `n${i}`;
-        nodes.push({
-          id, name: parts[i].label, x, y,
-          symbol: "circle", symbolSize: nodeSize,
-          itemStyle: parts[i].style,
-          label: { show:true, position:"inside", color:"#111", fontSize: 14, fontWeight: 600 }
-        });
-        links.push({ source: "project", target: id, lineStyle: { color: COLORS.link, width: 1.6 } });
-      }
+      const radius=280, step=360/items.length;
+      items.forEach((it,i)=>{
+        const ang=(i*step-90)*Math.PI/180;
+        const x=cx+Math.cos(ang)*radius, y=cy+Math.sin(ang)*radius;
+        nodes.push({id:`n${i}`, name:it.label, x,y, symbol:"circle", symbolSize:130,
+          itemStyle:it.style, label:{show:true, position:"inside", color:"#111", fontSize:14, fontWeight:600}});
+        links.push({source:"project", target:`n${i}`, lineStyle:{color:COLORS.link, width:1.6}});
+      });
 
       chart.clear();
       chart.setOption({
-        backgroundColor: COLORS.bg,
-        series: [{
-          type: "graph",
-          layout: "none",
-          data: nodes,
-          links,
-          roam: true,
-          lineStyle: { color: COLORS.link, width: 1.6 },
-          emphasis: { focus: "adjacency" },
-          label: { rotate: 0 }
-        }],
-        tooltip: { trigger: "item", formatter: p => p.data?.name || "" }
+        backgroundColor:COLORS.bg,
+        series:[{type:"graph", layout:"none", data:nodes, links, roam:true,
+          lineStyle:{color:COLORS.link, width:1.6}, emphasis:{focus:"adjacency"}}],
+        tooltip:{trigger:"item", formatter:p=>p.data?.name || ""}
       });
-
-      // Click the centered project bubble to go Home
       chart.off("click");
-      chart.on("click", p => { if (p.data?.id === "project") setHome(); });
-
-      // UI state
-      uiControl.classList.remove("open");
+      chart.on("click",p=>{ if(p.data?.id==="project") setHome(); });
+      document.getElementById("homeBtn").style.display="inline-block";
     }
 
-    // ----------------- UI (text-based) -----------------
-    const uiControl = document.getElementById("uiControl");
-    const pickerPanel = document.getElementById("pickerPanel");
+    const pickerWrap=document.getElementById("pickerWrap");
+    const pickerToggle=document.getElementById("pickerToggle");
+    const pickerPanel=document.getElementById("pickerPanel");
+    const pickerItems=document.getElementById("pickerItems");
+    const homeBtn=document.getElementById("homeBtn");
 
-    // Build dropdown list (square corners, minimal)
-    function buildPicker(){
-      pickerPanel.innerHTML = "";
-      rows.forEach(r => {
-        const d = document.createElement("div");
-        d.className = "picker-item";
-        d.textContent = r.project;
-        d.title = r.project;
-        d.addEventListener("click", () => {
-          uiControl.classList.remove("open");
-          openProject(r.project);
-        });
-        pickerPanel.appendChild(d);
-      });
-    }
-
-    // Clicking the control toggles the project list (and rotates + to ×)
-    uiControl.addEventListener("click", () => {
-      uiControl.classList.toggle("open");
+    rows.forEach(r=>{
+      const d=document.createElement("div");
+      d.className="picker-item"; d.textContent=r.project;
+      d.addEventListener("click",()=>{pickerWrap.classList.remove("open");openProject(r.project);});
+      pickerItems.appendChild(d);
     });
+    pickerToggle.addEventListener("click",()=>pickerWrap.classList.toggle("open"));
+    document.addEventListener("click",e=>{if(!pickerWrap.contains(e.target))pickerWrap.classList.remove("open");});
+    homeBtn.addEventListener("click",()=>{pickerWrap.classList.remove("open");setHome();});
 
-    // Clicking the "Home" text always returns to overview (and closes picker)
-    uiControl.querySelector(".home").addEventListener("click", (e) => {
-      e.stopPropagation();
-      setHome();
-      uiControl.classList.remove("open");
-    });
-
-    // Close picker when clicking outside
-    document.addEventListener("click", (e) => {
-      if (!uiControl.contains(e.target)) uiControl.classList.remove("open");
-    });
-
-    // Init
-    buildPicker();
     setHome();
-
-    // Responsive polish
-    window.addEventListener("resize", () => chart.resize({ animation: { duration: 120 } }), { passive: true });
-    document.addEventListener("gesturestart", e => e.preventDefault(), { passive: false });
+    window.addEventListener("resize",()=>chart.resize({animation:{duration:120}}),{passive:true});
+    document.addEventListener("gesturestart",e=>e.preventDefault(),{passive:false});
   </script>
 </body>
 </html>
